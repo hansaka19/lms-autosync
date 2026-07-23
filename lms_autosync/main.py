@@ -36,6 +36,19 @@ def run(username=None, password=None, output_path="output/LMS_Schedule.xlsx",
         events = scanner.get_calendar_events_multi_month(page, months_back=3, months_ahead=4)
         log.info(f"Found {len(events)} calendar events (multi-month)")
 
+        # Safety-net: dashboard එකෙන් courses හම්බුණේ නැත්නම් (slow instance එකක
+        # course cards render වෙන්නෙ නැති වෙන්න පුළුවන්), calendar events වලින්ම
+        # deadlines හදනවා — user ට හිස් result එකක් යන්නේ නෑ.
+        if not courses:
+            log.warning("Found 0 courses — falling back to calendar events for deadlines")
+            all_deadlines = matcher.deadlines_from_calendar(events)
+            for d in all_deadlines:
+                if parsers.is_lab_test_or_quiz(d):
+                    d["category"] = parsers.categorize_lab_quiz(d)
+                    d["due_at_full"] = d.get("due_date")
+                    all_lab_quiz.append(d)
+            progress(f"Courses හම්බුණේ නෑ — calendar එකෙන් deadlines {len(all_deadlines)}ක් හදනවා...")
+
         for idx, course in enumerate(courses, 1):
             progress(f"Course {idx}/{len(courses)}: {course['name']} scan කරනවා...")
             try:

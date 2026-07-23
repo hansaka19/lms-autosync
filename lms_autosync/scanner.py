@@ -6,24 +6,84 @@ def scan_dashboard(page):
     """FR-2: courses ටිකයි calendar events ටිකයි දෙකම /my/ page එකෙන්ම
     extract කරනවා - වෙනම navigation එකක් ඕන නෑ."""
     page.goto(config.LMS_BASE_URL + config.LMS_DASHBOARD_PATH)
-    page.wait_for_load_state("networkidle")
-    soup = BeautifulSoup(page.content(), "html.parser")
-
-    courses = _parse_courses(soup)
-    events = _parse_calendar_events(soup)
+    courses = _load_courses(page)
+    events = _parse_calendar_events(BeautifulSoup(page.content(), "html.parser"))
     return courses, events
+
+
+def _load_courses(page):
+    """Course overview block එකේ cards ටික JavaScript/AJAX වලින් load වෙනවා.
+    Render වගේ slow (0.1 CPU) instance එකක networkidle එක මදි වෙන නිසා —
+    අඩුම එක card එකක් render වෙනකම් explicit-a wait කරලා, scroll කරලා,
+    ඊට පස්සේ parse කරනවා."""
+    page.wait_for_load_state("networkidle")
+    _wait_and_scroll(page)
+    courses = _parse_courses(BeautifulSoup(page.content(), "html.parser"))
+
+    # තවමත් 0 නම්, Moodle 4.x dedicated "My courses" page එකෙනුත් try කරනවා.
+    if not courses:
+        try:
+            page.goto(config.LMS_BASE_URL + "/my/courses.php")
+            page.wait_for_load_state("networkidle")
+            _wait_and_scroll(page)
+            courses = _parse_courses(BeautifulSoup(page.content(), "html.parser"))
+        except Exception:
+            pass
+    return courses
+
+
+def _wait_and_scroll(page):
+    """Course cards render වෙනකම් 30s දක්වා wait කරලා, lazy-load trigger
+    කරන්න page එක ටික ටික scroll කරනවා."""
+    try:
+        page.wait_for_selector(
+            "div.course-summaryitem[data-region='course-content'], [data-region='course-content']",
+            timeout=30000,
+        )
+    except Exception:
+        pass
+    for _ in range(4):
+        try:
+            page.mouse.wheel(0, 4000)
+        except Exception:
+            pass
+        page.wait_for_timeout(700)
+
 
 def _parse_courses(soup):
     courses = []
-    for card in soup.select("div.course-summaryitem[data-region='course-content']"):
-        name_el = card.select_one(".summary-image .sr-only")
-        link_el = card.select_one("a.aalink.coursename")
-        if not name_el or not link_el:
+    seen = set()
+    cards = soup.select("div.course-summaryitem[data-region='course-content']")
+    if not cards:
+        # layout/version වෙනස් උනොත් fallback selector එක
+        cards = soup.select("[data-region='course-content']")
+
+    for card in cards:
+        link_el = (card.select_one("a.aalink.coursename")
+                   or card.select_one("a.coursename")
+                   or card.select_one("a[href*='/course/view.php']"))
+        if not link_el:
             continue
+
+        name_el = (card.select_one(".summary-image .sr-only")
+                   or card.select_one(".sr-only")
+                   or card.select_one(".coursename .multiline")
+                   or card.select_one(".coursename"))
+        name = name_el.get_text(strip=True) if name_el else ""
+        if not name:
+            name = link_el.get_text(strip=True) or link_el.get("aria-label") or "Course"
+
+        url = link_el.get("href")
+        if isinstance(url, list):
+            url = "".join(url)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+
         courses.append({
             "id": card.get("data-course-id"),
-            "name": name_el.get_text(strip=True),
-            "url": link_el["href"],
+            "name": name,
+            "url": url,
         })
     return courses
 

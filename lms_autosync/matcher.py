@@ -1,5 +1,40 @@
 from datetime import date, timedelta
 
+_COMPONENT_TYPE = {
+    "mod_assign": "assign",
+    "mod_quiz": "quiz",
+    "mod_choice": "choice",
+}
+
+
+def deadlines_from_calendar(events):
+    """Course scan එක fail උනොත් (Found 0 courses), calendar events වලින්ම
+    deadline list එකක් හදනවා — due/close events විතරක් අරගෙන. මේක safety-net
+    එකක්: courses හම්බුණේ නැති උනත් අඩුම deadlines ටික user ට පේනවා."""
+    deadlines = []
+    seen = set()
+    for ev in events:
+        if ev.get("event_type") not in ("due", "close"):
+            continue
+        key = (ev.get("url"), ev.get("date"))
+        if key in seen:
+            continue
+        seen.add(key)
+        comp = ev.get("component") or ""
+        item = {
+            "course": "(from calendar)",
+            "name": ev.get("title") or "Untitled",
+            "type": _COMPONENT_TYPE.get(comp, comp.replace("mod_", "") or "event"),
+            "url": ev.get("url"),
+            "due_date": ev.get("date"),
+            "is_deadline": True,
+            "is_resource": False,
+        }
+        classify_deadline(item)
+        deadlines.append(item)
+    return deadlines
+
+
 def attach_due_dates(course_items, calendar_events):
     """Calendar event URLs (mod/assign/view.php?id=... වගේ) course item
     URLs ටිකට match කරලා, deadline items වලට exact due date එක දානවා."""

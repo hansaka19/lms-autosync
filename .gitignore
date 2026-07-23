@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+logs/
+output/
+data/
+.DS_Store
+.vscode/
+debug_login_page.png

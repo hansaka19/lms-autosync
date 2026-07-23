@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMS Auto-Sync — Dashboard</title>
+<style>
+  :root {
+    --navy-1: #0f2a5c; --navy-2: #1e56b0; --navy-3: #2f74d6;
+    --ink: #14336b; --text: #23304a; --muted: #7c8aa5;
+    --panel: #dce9f7; --panel-2: #cfe0f2; --card: #ffffff; --line: #e6edf7;
+    --chip: #eaf1fb; --accent: #2e63c4;
+    --red: #d64550; --amber: #c98a12; --green: #1e8a4c;
+    --r-lg: 22px; --r-md: 16px; --r-sm: 12px;
+    --shadow: 0 8px 24px rgba(15, 42, 92, .10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Poppins", "Segoe UI", "Noto Sans Sinhala", system-ui, sans-serif;
+    background: #eef4fb; color: var(--text); min-height: 100vh;
+  }
+  a { color: var(--accent); text-decoration: none; }
+
+  /* ============ LOGIN VIEW ============ */
+  #login-view {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--navy-1) 0%, var(--navy-2) 55%, var(--navy-3) 100%);
+    padding: 20px;
+  }
+  .login-card {
+    background: #fff; border-radius: var(--r-lg); box-shadow: var(--shadow);
+    width: 100%; max-width: 420px; padding: 38px 34px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .brand-badge {
+    width: 48px; height: 48px; border-radius: 14px; display: flex;
+    align-items: center; justify-content: center; font-size: 24px;
+    background: linear-gradient(135deg, var(--navy-1), var(--navy-3)); color: #fff;
+  }
+  .brand h1 { font-size: 1.15rem; color: var(--ink); }
+  .brand p { font-size: .78rem; color: var(--muted); }
+  .login-card label { display: block; font-weight: 600; font-size: .85rem;
+    color: var(--ink); margin: 16px 0 7px; }
+  .login-card input {
+    width: 100%; padding: 13px 15px; border: 1.5px solid var(--line);
+    border-radius: var(--r-sm); font-size: .95rem; background: #f7fafd;
+  }
+  .login-card input:focus { outline: none; border-color: var(--navy-2); background: #fff; }
+  .btn-primary {
+    width: 100%; margin-top: 24px; padding: 14px; border: 0; cursor: pointer;
+    border-radius: var(--r-sm); font-size: 1rem; font-weight: 600; color: #fff;
+    background: linear-gradient(135deg, var(--navy-2), var(--navy-3));
+    box-shadow: 0 6px 16px rgba(30, 86, 176, .35);
+  }
+  .btn-primary:hover { filter: brightness(1.07); }
+  .btn-primary:disabled { filter: grayscale(.6); cursor: not-allowed; }
+  .privacy { margin-top: 18px; font-size: .78rem; color: var(--muted); line-height: 1.55; }
+  .error-box {
+    display: none; margin-top: 16px; background: #fdecec; color: var(--red);
+    border: 1px solid #f5c6cb; border-radius: var(--r-sm); padding: 12px 14px;
+    font-size: .88rem; line-height: 1.5;
+  }
+  /* progress state inside login card */
+  #login-progress { display: none; text-align: center; padding: 10px 0 4px; }
+  .spinner {
+    width: 46px; height: 46px; border: 5px solid var(--panel);
+    border-top-color: var(--navy-2); border-radius: 50%;
+    animation: spin 1s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #progress-text { font-weight: 600; color: var(--ink); font-size: .95rem; }
+  .progress-hint { font-size: .8rem; color: var(--muted); margin-top: 8px; }
+
+  /* ============ DASHBOARD VIEW ============ */
+  #dash-view { display: none; }
+  .layout { display: grid; grid-template-columns: 250px 1fr 330px; min-height: 100vh; }
+
+  /* --- sidebar --- */
+  .sidebar {
+    background: linear-gradient(180deg, var(--navy-1) 0%, var(--navy-2) 100%);
+    color: #fff; padding: 26px 16px; display: flex; flex-direction: column;
+    border-radius: 0 26px 26px 0;
+  }
+  .sidebar .brand h1 { color: #fff; }
+  .sidebar .brand p { color: rgba(255,255,255,.65); }
+  .nav { margin-top: 28px; display: flex; flex-direction: column; gap: 6px; }
+  .nav button {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: transparent; border: 0; color: rgba(255,255,255,.85);
+    padding: 12px 16px; border-radius: 999px; font-size: .93rem;
+    cursor: pointer; text-align: left; font-family: inherit;
+  }
+  .nav button:hover { background: rgba(255,255,255,.10); }
+  .nav button.active { background: rgba(255,255,255,.22); color: #fff; font-weight: 600; }
+  .sidebar-foot {
+    margin-top: auto; background: rgba(255,255,255,.12); border-radius: 999px;
+    padding: 10px 16px; font-size: .85rem; display: flex; align-items: center; gap: 10px;
+  }
+
+  /* --- main column --- */
+  .main { padding: 34px 34px 60px; min-width: 0; }
+  .main h2.page-title { font-size: 2rem; color: var(--ink); font-weight: 700; }
+  .main .sub { color: var(--accent); font-weight: 600; font-size: .9rem; margin-top: 4px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+  .stat-card {
+    background: var(--card); border-radius: var(--r-md); padding: 20px 22px;
+    box-shadow: var(--shadow); display: flex; align-items: center;
+    justify-content: space-between; gap: 12px;
+  }
+  .stat-card .icon {
+    width: 46px; height: 46px; border-radius: 12px; background: var(--chip);
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .stat-card .num { font-size: 1.7rem; font-weight: 700; color: var(--ink); text-align: right; }
+  .stat-card .lbl { font-size: .82rem; color: var(--muted); text-align: right; }
+  .stat-card.good .num { color: var(--green); }
+
+  .section-card {
+    background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow);
+    padding: 24px; margin-top: 24px;
+  }
+  .section-card h3 { color: var(--accent); font-size: 1.05rem; margin-bottom: 18px; }
+
+  /* course progress bars */
+  .course-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .course-dot {
+    width: 40px; height: 40px; border-radius: 50%; flex: none;
+    background: radial-gradient(circle at 30% 30%, var(--navy-3), var(--navy-1));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: .85rem;
+  }
+  .course-info { flex: 1; min-width: 0; }
+  .course-info .cname { font-size: .9rem; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { position: relative; height: 10px; background: var(--panel);
+    border-radius: 999px; margin-top: 7px; overflow: hidden; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+    background: linear-gradient(90deg, var(--navy-1), var(--navy-3)); }
+  .course-count { font-size: .78rem; color: var(--muted); flex: none; }
+
+  /* tables */
+  .tbl-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: .78rem;
+    padding: 8px 10px; border-bottom: 2px solid var(--line); }
+  td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .urg { font-weight: 700; font-size: .8rem; padding: 3px 10px; border-radius: 999px; }
+  .urg-Overdue { background: #fdecec; color: var(--red); }
+  .urg-DueSoon { background: #fdf6e3; color: var(--amber); }
+  .urg-Upcoming { background: #e8f7ee; color: var(--green); }
+  .urg-Unknown { background: var(--chip); color: var(--muted); }
+
+  /* announcements */
+  .ann-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .ann-item:last-child { border-bottom: 0; }
+  .ann-icon { font-size: 20px; flex: none; }
+  .ann-body { min-width: 0; flex: 1; }
+  .ann-title { font-weight: 600; color: var(--ink); font-size: .92rem; }
+  .ann-meta { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+  .ann-date { font-size: .78rem; color: var(--muted); flex: none; font-weight: 600; }
+
+  /* --- right panel --- */
+  .rightbar { background: var(--panel); padding: 30px 22px; border-radius: 26px 0 0 26px; }
+  .who { display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    font-weight: 600; color: var(--ink); font-size: .9rem; margin-bottom: 24px; }
+  .who .avatar { width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--navy-2), var(--navy-3)); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .upcoming {
+    background: linear-gradient(160deg, var(--navy-2), var(--navy-1));
+    border-radius: var(--r-lg); padding: 20px; color: #fff; box-shadow: var(--shadow);
+  }
+  .upcoming h3 { font-size: 1.05rem; margin-bottom: 14px; }
+  .up-item {
+    display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,.16);
+    border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 10px;
+  }
+  .up-item:last-child { margin-bottom: 0; }
+  .up-icon { font-size: 18px; flex: none; }
+  .up-name { font-size: .85rem; font-weight: 600; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .up-due { font-size: .72rem; opacity: .8; margin-top: 2px; }
+  .up-empty { font-size: .85rem; opacity: .8; }
+
+  /* calendar */
+  .cal-card { background: transparent; margin-top: 26px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; }
+  .cal-head h3 { color: var(--ink); font-size: 1.05rem; }
+  .cal-month { text-align: center; font-weight: 600; color: var(--ink);
+    font-size: .92rem; margin-bottom: 10px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    text-align: center; font-size: .78rem; }
+  .cal-grid .dow { color: var(--muted); font-weight: 600; padding: 4px 0; }
+  .cal-grid .day { padding: 7px 0; border-radius: 50%; color: var(--text); }
+  .cal-grid .day.today { background: var(--navy-2); color: #fff; font-weight: 700; }
+  .cal-grid .day.blank { visibility: hidden; }
+
+  /* download */
+  .dl-card { margin-top: 26px; background: var(--card); border-radius: var(--r-lg);
+    padding: 20px; box-shadow: var(--shadow); text-align: center; }
+  .dl-card p { font-size: .82rem; color: var(--muted); margin-bottom: 12px; }
+  .btn-gold {
+    display: inline-block; background: linear-gradient(135deg, #f0a500, #f7c948);
+    color: var(--navy-1); font-weight: 700; padding: 12px 20px;
+    border-radius: var(--r-sm); font-size: .9rem;
+  }
+  .btn-resync { margin-top: 12px; background: transparent; border: 1.5px solid var(--navy-2);
+    color: var(--navy-2); padding: 10px 18px; border-radius: var(--r-sm);
+    font-weight: 600; cursor: pointer; font-size: .85rem; font-family: inherit; }
+
+  .view-section { display: none; }
+  .view-section.active { display: block; }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px 1fr; }
+    .rightbar { display: none; }
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { flex-direction: row; align-items: center; border-radius: 0;
+      padding: 14px 16px; overflow-x: auto; }
+    .nav { flex-direction: row; margin-top: 0; margin-left: 10px; }
+    .nav button { padding: 9px 13px; white-space: nowrap; }
+    .sidebar-foot, .sidebar .brand p { display: none; }
+    .main { padding: 20px 16px 50px; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="login-view">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-badge">📚</div>
+      <div>
+        <h1>LMS Auto-Sync</h1>
+        <p>OUSL Learning Management · Deadline Tracker</p>
+      </div>
+    </div>
+
+    <form id="sync-form">
+      <label for="username">Student S-Number / IAM Username</label>
+      <input id="username" type="text" autocomplete="username" required
+             placeholder="e.g. S20007800">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required
+             placeholder="ඔයාගේ IAM OUSL password එක">
+      <button class="btn-primary" id="go-btn" type="submit">Sign in &amp; Sync 🔄</button>
+    </form>
+
+    <div id="login-progress">
+      <div class="spinner"></div>
+      <div id="progress-text">පටන් ගන්නවා...</div>
+      <div class="progress-hint">මිනිත්තු 2–4ක් විතර යනවා — page එක close කරන්න එපා</div>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <p class="privacy">🔒 Password එක LMS login එකට විතරක් use වෙනවා — server එකේ
+      <b>save වෙන්නේ නෑ</b>. Code එක open-source.</p>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dash-view">
+  <div class="layout">
+
+    <!-- sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">📚</div>
+        <div>
+          <h1>LMS Auto-Sync</h1>
+          <p>Learning Management</p>
+        </div>
+      </div>
+      <nav class="nav" id="nav">
+        <button data-view="overview" class="active">🏠 Dashboard</button>
+        <button data-view="deadlines">⏰ Deadlines</button>
+        <button data-view="labquiz">🧪 Lab / Quiz / TMA</button>
+        <button data-view="announcements">📣 Announcements</button>
+      </nav>
+      <div class="sidebar-foot">👤 <span id="side-user">Student</span></div>
+    </aside>
+
+    <!-- main -->
+    <main class="main">
+      <h2 class="page-title">Dashboard</h2>
+      <div class="sub">Course Overview</div>
+
+      <!-- OVERVIEW -->
+      <div class="view-section active" id="view-overview">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="icon">⏰</div>
+            <div><div class="num" id="c-deadlines">0</div><div class="lbl">Deadlines</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="icon">🧪</div>
+            <div><div class="num" id="c-labquiz">0</div><div class="lbl">Lab / Quiz / TMA</div></div>
+          </div>
+          <div class="stat-card good">
+            <div class="icon">📁</div>
+            <div><div class="num" id="c-resources">0</div><div class="lbl">Resources</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="icon">📣</div>
+            <div><div class="num" id="c-announcements">0</div><div class="lbl">Announcements</div></div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <h3>Course Progress <span style="color:var(--muted);font-weight:400;font-size:.8rem">(deadlines per course)</span></h3>
+          <div id="course-bars"></div>
+        </div>
+      </div>
+
+      <!-- DEADLINES -->
+      <div class="view-section" id="view-deadlines">
+        <div class="section-card">
+          <h3>⏰ Deadlines — දවස් පිළිවෙළට</h3>
+          <div id="deadline-groups"></div>
+        </div>
+      </div>
+
+      <!-- LAB / QUIZ -->
+      <div class="view-section" id="view-labquiz">
+        <div class="section-card">
+          <h3>🧪 Lab Tests / Quizzes / TMA</h3>
+          <div class="tbl-scroll"><table>
+            <thead><tr><th>Course</th><th>Item</th><th>Category</th><th>Opens</th><th>Due</th></tr></thead>
+            <tbody id="tbl-labquiz"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ANNOUNCEMENTS -->
+      <div class="view-section" id="view-announcements">
+        <div class="section-card">
+          <h3>📣 Announcements</h3>
+          <div id="ann-list"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- right panel -->
+    <aside class="rightbar">
+      <div class="who"><span id="who-user">Student</span><div class="avatar" id="who-avatar">S</div></div>
+
+      <div class="upcoming">
+        <h3>Upcoming</h3>
+        <div id="upcoming-list"></div>
+      </div>
+
+      <div class="cal-card">
+        <div class="cal-head"><h3>Calendar</h3></div>
+        <div class="cal-month" id="cal-month"></div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+
+      <div class="dl-card">
+        <p>Schedule එක Excel විදිහට ගන්න</p>
+        <a class="btn-gold" id="dl-link" href="#">⬇️ Download Excel</a><br>
+        <button class="btn-resync" onclick="location.reload()">🔄 ආයෙ Sync කරන්න</button>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- login + sync flow ---------- */
+$('sync-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('error-box').style.display = 'none';
+  $('go-btn').disabled = true;
+
+  const username = $('username').value.trim();
+  const body = JSON.stringify({ username, password: $('password').value });
+  $('password').value = '';
+
+  try {
+    const r = await fetch('/api/sync', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || 'Request failed');
+    const { job_id } = await r.json();
+    $('sync-form').style.display = 'none';
+    $('login-progress').style.display = 'block';
+    poll(job_id, username);
+  } catch (err) { showError(err.message); }
+});
+
+async function poll(jobId, username) {
+  try {
+    const r = await fetch('/api/status/' + jobId);
+    if (!r.ok) throw new Error((await r.json()).detail || 'Status check failed');
+    const s = await r.json();
+    if (s.status === 'running') {
+      $('progress-text').textContent = s.progress || '...';
+      setTimeout(() => poll(jobId, username), 2500);
+    } else if (s.status === 'done') {
+      renderDashboard(s.summary, jobId, username);
+    } else throw new Error(s.error || 'Unknown error');
+  } catch (err) { showError(err.message); }
+}
+
+function showError(msg) {
+  $('login-progress').style.display = 'none';
+  $('sync-form').style.display = 'block';
+  $('go-btn').disabled = false;
+  const box = $('error-box');
+  box.textContent = '⚠️ ' + msg;
+  box.style.display = 'block';
+}
+
+/* ---------- dashboard render ---------- */
+function renderDashboard(sum, jobId, username) {
+  $('login-view').style.display = 'none';
+  $('dash-view').style.display = 'block';
+
+  $('side-user').textContent = username;
+  $('who-user').textContent = username;
+  $('who-avatar').textContent = (username[0] || 'S').toUpperCase();
+
+  $('c-deadlines').textContent = sum.counts.deadlines;
+  $('c-labquiz').textContent = sum.counts.lab_quiz;
+  $('c-resources').textContent = sum.counts.resources;
+  $('c-announcements').textContent = sum.counts.announcements;
+  $('dl-link').href = '/api/download/' + jobId;
+
+  /* course progress bars — deadlines per course */
+  const perCourse = {};
+  sum.deadlines.forEach(d => { perCourse[d.course] = (perCourse[d.course] || 0) + 1; });
+  const courses = Object.entries(perCourse).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...courses.map(c => c[1]));
+  $('course-bars').innerHTML = courses.map(([name, n]) => `
+    <div class="course-row">
+      <div class="course-dot">${esc(name.replace(/[^A-Z0-9]/g, '').slice(0, 3) || '📘')}</div>
+      <div class="course-info">
+        <div class="cname">${esc(name)}</div>
+        <div class="bar"><i style="width:${Math.round(n / max * 100)}%"></i></div>
+      </div>
+      <div class="course-count">${n} deadline${n > 1 ? 's' : ''}</div>
+    </div>`).join('') || '<p style="color:var(--muted)">Deadlines නෑ 🎉</p>';
+
+  /* deadlines — දවස් පිළිවෙළට group කරලා */
+  renderDeadlineGroups(sum.deadlines);
+
+  /* lab quiz table */
+  $('tbl-labquiz').innerHTML = sum.lab_quiz.map(i => `<tr>
+      <td>${esc(i.course)}</td>
+      <td>${i.url ? `<a href="${esc(i.url)}" target="_blank">${esc(i.name)}</a>` : esc(i.name)}</td>
+      <td>${esc(i.category || '—')}</td>
+      <td>${esc(i.opened_at || '—')}</td>
+      <td><b>${esc(i.due_at_full || '—')}</b></td>
+    </tr>`).join('') || '<tr><td colspan="5">නෑ</td></tr>';
+
+  /* announcements */
+  $('ann-list').innerHTML = (sum.announcements || []).map(a => `
+    <div class="ann-item">
+      <div class="ann-icon">📢</div>
+      <div class="ann-body">
+        <div class="ann-title">${a.url ? `<a href="${esc(a.url)}" target="_blank">${esc(a.title)}</a>` : esc(a.title)}</div>
+        <div class="ann-meta">${esc(a.course)}${a.author ? ' · ' + esc(a.author) : ''}</div>
+      </div>
+      <div class="ann-date">${esc(a.date || '')}</div>
+    </div>`).join('') || '<p style="color:var(--muted)">Announcements නෑ</p>';
+
+  /* upcoming (right panel) — lab/quiz items with due dates first */
+  const upcoming = [...sum.lab_quiz]
+    .sort((a, b) => String(a.due_at_full || 'zzz').localeCompare(String(b.due_at_full || 'zzz')))
+    .slice(0, 5);
+  $('upcoming-list').innerHTML = upcoming.map(i => `
+    <div class="up-item">
+      <div class="up-icon">📝</div>
+      <div>
+        <div class="up-name">${esc(i.name)}</div>
+        <div class="up-due">Due ${esc(i.due_at_full || i.opened_at || '—')} · ${esc(i.course)}</div>
+      </div>
+    </div>`).join('') || '<div class="up-empty">ළඟදීම deadlines නෑ 🎉</div>';
+
+  buildCalendar();
+
+  /* nav switching */
+  document.querySelectorAll('#nav button').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+      $('view-' + btn.dataset.view).classList.add('active');
+    };
+  });
+}
+
+/* ---------- deadlines grouped by date ---------- */
+function relativeLabel(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = new Date(dateStr + 'T00:00:00');
+  const diff = Math.round((due - today) / 86400000);
+  if (diff === 0)  return { text: 'අද!', cls: 'urg-DueSoon' };
+  if (diff === 1)  return { text: 'හෙට', cls: 'urg-DueSoon' };
+  if (diff < 0)    return { text: `දවස් ${-diff}කට කලින් ඉවරයි`, cls: 'urg-Overdue' };
+  if (diff <= 7)   return { text: `තව දවස් ${diff}යි`, cls: 'urg-DueSoon' };
+  return { text: `තව දවස් ${diff}ක්`, cls: 'urg-Upcoming' };
+}
+
+function renderDeadlineGroups(deadlines) {
+  const dated = deadlines.filter(d => d.due_date)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const noDate = deadlines.filter(d => !d.due_date);
+
+  const groups = {};
+  dated.forEach(d => (groups[d.due_date] = groups[d.due_date] || []).push(d));
+
+  const itemRow = d => `
+    <div class="ann-item">
+      <div class="ann-icon">📌</div>
+      <div class="ann-body">
+        <div class="ann-title">${d.url ? `<a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a>` : esc(d.name)}</div>
+        <div class="ann-meta">${esc(d.course)}${d.type ? ' · ' + esc(d.type) : ''}</div>
+      </div>
+      <div><span class="urg urg-${esc((d.urgency || 'Unknown').replace(' ', ''))}">${esc(d.urgency || '—')}</span></div>
+    </div>`;
+
+  let html = Object.entries(groups).map(([dateStr, items]) => {
+    const day = new Date(dateStr + 'T00:00:00')
+      .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    const rel = relativeLabel(dateStr);
+    return `
+      <div style="margin-bottom:22px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <div style="font-weight:700;color:var(--ink);font-size:.95rem">📅 ${esc(day)}</div>
+          <span class="urg ${rel.cls}">${rel.text}</span>
+        </div>
+        ${items.map(itemRow).join('')}
+      </div>`;
+  }).join('');
+
+  if (noDate.length) {
+    html += `
+      <div style="margin-bottom:8px">
+        <div style="font-weight:700;color:var(--muted);font-size:.95rem;margin-bottom:4px">📅 Date එකක් නැති ඒවා</div>
+        ${noDate.map(itemRow).join('')}
+      </div>`;
+  }
+
+  $('deadline-groups').innerHTML = html || '<p style="color:var(--muted)">Deadlines නෑ 🎉</p>';
+}
+
+/* ---------- mini calendar ---------- */
+function buildCalendar() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  $('cal-month').textContent = now.toLocaleString('en', { month: 'long' }) + ' ' + y;
+  const first = new Date(y, m, 1);
+  const days = new Date(y, m + 1, 0).getDate();
+  let startDow = (first.getDay() + 6) % 7;   // Monday = 0
+  const dows = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let html = dows.map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i = 0; i < startDow; i++) html += '<div class="day blank">·</div>';
+  for (let d = 1; d <= days; d++)
+    html += `<div class="day${d === now.getDate() ? ' today' : ''}">${d}</div>`;
+  $('cal-grid').innerHTML = html;
+}
+</script>
+</body>
+</html>

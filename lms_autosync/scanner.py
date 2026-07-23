@@ -5,7 +5,8 @@ from . import config
 def scan_dashboard(page):
     """FR-2: courses ටිකයි calendar events ටිකයි දෙකම /my/ page එකෙන්ම
     extract කරනවා - වෙනම navigation එකක් ඕන නෑ."""
-    page.goto(config.LMS_BASE_URL + config.LMS_DASHBOARD_PATH)
+    page.goto(config.LMS_BASE_URL + config.LMS_DASHBOARD_PATH,
+              wait_until="domcontentloaded", timeout=60000)
     courses = _load_courses(page)
     events = _parse_calendar_events(BeautifulSoup(page.content(), "html.parser"))
     return courses, events
@@ -16,15 +17,16 @@ def _load_courses(page):
     Render වගේ slow (0.1 CPU) instance එකක networkidle එක මදි වෙන නිසා —
     අඩුම එක card එකක් render වෙනකම් explicit-a wait කරලා, scroll කරලා,
     ඊට පස්සේ parse කරනවා."""
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("domcontentloaded")
     _wait_and_scroll(page)
     courses = _parse_courses(BeautifulSoup(page.content(), "html.parser"))
 
     # තවමත් 0 නම්, Moodle 4.x dedicated "My courses" page එකෙනුත් try කරනවා.
     if not courses:
         try:
-            page.goto(config.LMS_BASE_URL + "/my/courses.php")
-            page.wait_for_load_state("networkidle")
+            page.goto(config.LMS_BASE_URL + "/my/courses.php",
+                      wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_load_state("domcontentloaded")
             _wait_and_scroll(page)
             courses = _parse_courses(BeautifulSoup(page.content(), "html.parser"))
         except Exception:
@@ -38,16 +40,16 @@ def _wait_and_scroll(page):
     try:
         page.wait_for_selector(
             "div.course-summaryitem[data-region='course-content'], [data-region='course-content']",
-            timeout=30000,
+            timeout=20000,
         )
     except Exception:
         pass
-    for _ in range(4):
+    for _ in range(2):
         try:
             page.mouse.wheel(0, 4000)
         except Exception:
             pass
-        page.wait_for_timeout(700)
+        page.wait_for_timeout(400)
 
 
 def _parse_courses(soup):
@@ -111,8 +113,9 @@ def get_calendar_events_multi_month(page, months_back=0, months_ahead=4):
     """Current month + ඉදිරි 'months_ahead' මාස ටිකේම සහ පසුගිය 'months_back' මාස ටිකේම calendar events ටික
     scan කරනවා - assignment due dates බොහෝවිට එක month එකකට වඩා ඈතට
     හෝ පසුගිය කාලයට තියෙන නිසා."""
-    page.goto(config.LMS_BASE_URL + config.LMS_DASHBOARD_PATH)
-    page.wait_for_load_state("networkidle")
+    page.goto(config.LMS_BASE_URL + config.LMS_DASHBOARD_PATH,
+              wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_load_state("domcontentloaded")
     soup = BeautifulSoup(page.content(), "html.parser")
 
     # months_back ප්‍රමාණයට ආපස්සට යනවා
@@ -120,8 +123,7 @@ def get_calendar_events_multi_month(page, months_back=0, months_ahead=4):
         prev_link = soup.select_one("a.arrow_link.previous")
         if not prev_link or not prev_link.get("href"):
             break
-        page.goto(prev_link["href"])
-        page.wait_for_load_state("networkidle")
+        page.goto(prev_link["href"], wait_until="domcontentloaded", timeout=60000)
         soup = BeautifulSoup(page.content(), "html.parser")
 
     # දැන් ආරම්භක මාසයේ සිට months_back + months_ahead ප්‍රමාණයට ඉදිරියට යමින් scan කරනවා
@@ -130,8 +132,7 @@ def get_calendar_events_multi_month(page, months_back=0, months_ahead=4):
         next_link = soup.select_one("a.arrow_link.next")
         if not next_link or not next_link.get("href"):
             break
-        page.goto(next_link["href"])
-        page.wait_for_load_state("networkidle")
+        page.goto(next_link["href"], wait_until="domcontentloaded", timeout=60000)
         soup = BeautifulSoup(page.content(), "html.parser")
         all_events += _parse_calendar_events(soup)
 

@@ -52,8 +52,7 @@ def run(username=None, password=None, output_path="output/LMS_Schedule.xlsx",
         for idx, course in enumerate(courses, 1):
             progress(f"Course {idx}/{len(courses)}: {course['name']} scan කරනවා...")
             try:
-                page.goto(course["url"])
-                page.wait_for_load_state("networkidle")
+                page.goto(course["url"], wait_until="domcontentloaded", timeout=60000)
                 items = parsers.parse_course_page(page.content(), course["name"])
                 items = matcher.attach_due_dates(items, events)
 
@@ -68,8 +67,7 @@ def run(username=None, password=None, output_path="output/LMS_Schedule.xlsx",
                 # Announcements
                 ann_forum = parsers.find_announcements_forum(items)
                 if ann_forum and ann_forum.get("url"):
-                    page.goto(ann_forum["url"])
-                    page.wait_for_load_state("networkidle")
+                    page.goto(ann_forum["url"], wait_until="domcontentloaded", timeout=60000)
                     posts = parsers.parse_announcements(page.content(), course["name"])
                     all_announcements += posts
 
@@ -78,8 +76,7 @@ def run(username=None, password=None, output_path="output/LMS_Schedule.xlsx",
                 for item in lab_quiz:
                     if not item.get("url"):
                         continue
-                    page.goto(item["url"])
-                    page.wait_for_load_state("networkidle")
+                    page.goto(item["url"], wait_until="domcontentloaded", timeout=60000)
                     dates = parsers.parse_activity_dates(page.content()) or {}
                     item["opened_at"] = dates.get("Opened") or dates.get("Opens")
                     item["due_at_full"] = dates.get("Due") or dates.get("Closed") or dates.get("Closes")

@@ -15,9 +15,29 @@ KC_ERROR_SELECTORS = (
 )
 
 
+_BLOCKED_RESOURCE_TYPES = {"image", "media", "font", "stylesheet"}
+
+
+def _block_heavy_resources(context):
+    """Scraper එකට ඕන HTML/DOM විතරයි. Images, fonts, CSS, video වගේ බර
+    resources block කරලා page loads ගොඩක් වේගවත් කරනවා — විශේෂයෙන් slow
+    (0.1 CPU) instance එකක. Scripts/XHR/fetch block කරන්නේ නෑ (course cards
+    AJAX වලින් load වෙන නිසා)."""
+    def _route(route):
+        if route.request.resource_type in _BLOCKED_RESOURCE_TYPES:
+            try:
+                route.abort()
+                return
+            except Exception:
+                pass
+        route.continue_()
+    context.route("**/*", _route)
+
+
 def login(playwright, username=None, password=None):
     browser = playwright.chromium.launch(headless=config.HEADLESS)
     context = browser.new_context()
+    _block_heavy_resources(context)
     page = context.new_page()
 
     # Credentials parameter එකෙන් ආවේ නැත්නම් local keyring vault එකෙන් ගන්නවා
@@ -35,8 +55,8 @@ def login(playwright, username=None, password=None):
         raise RuntimeError(f"{prefix}: {detail} [page: {current_url}]")
 
     # 1. Native Moodle login page එකට යනවා
-    page.goto(config.LMS_BASE_URL + config.LMS_LOGIN_PATH)
-    page.wait_for_load_state("domcontentloaded")
+    page.goto(config.LMS_BASE_URL + config.LMS_LOGIN_PATH,
+              wait_until="domcontentloaded", timeout=60000)
 
     # 2. Keycloak එකට යනවා — කෙලින්ම redirect උනේ නැත්නම් SSO button එක click කරනවා
     if "iam.ou.ac.lk" not in page.url:
